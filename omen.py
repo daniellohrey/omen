@@ -1,4 +1,6 @@
+import time
 import datetime
+import argparse
 import pandas as pd
 import numpy as np
 from sklearn import preprocessing
@@ -6,49 +8,64 @@ from sklearn.linear_model import LinearRegression
 from sklearn.model_selection import train_test_split
 from alpha_vantage.foreignexchange import ForeignExchange
 
-#set constants
-ALPHA = "PLXD9IM2VJWSJAPE"
-FIELD = "4. close"
+def omen(key, from_symbol, to_symbol, interval=False):
+	"""Takes Alpha Vantage API key, currency pair and optional interval, and returns the predicted next value."""
 
-#fetch data
-api = ForeignExchange(key=ALPHA)
-#use list of all currencies
-#intraday is also available
-#use full output size
-#9pm utc is 8am aedt
-data, _ = api.get_currency_exchange_intraday(from_symbol="AUD", to_symbol="USD", outputsize="full", interval="60min")
+	#set constants
+	FIELD = "4. close"
 
-#extract required data
-time_series = []
-for date in data:
-	time_series.append((date, float(data[date][FIELD])))
-#remove data points from when market is closed
-time_series.sort(key=lambda tup : tup[0])
-print(len(time_series))
-last = time_series.pop()
-dates = []
-prices = []
-for date, price in time_series:
-	dates.append(date)
-	prices.append(price)
-	print(str(date) + " " + str(price))
-print("goal:")
-print(last[1])
+	#fetch data
+	api = ForeignExchange(key=key)
+	if interval:
+		data, _ = api.get_currency_exchange_intraday(from_symbol=from_symbol, to_symbol=to_symbol, outputsize="full", interval=interval)
+	else:
+		data, _ = api.get_currency_exchange_daily(from_symbol=from_symbol, to_symbol=to_symbol, outputsize="full")
 
-#build data structures
-df = pd.DataFrame(data = prices, index = dates, columns = ["price"])
-df["prediction"] = df[["price"]].shift(-1)
-x = np.array(df.drop(["prediction"], 1))
-x = preprocessing.scale(x)
-x_forecast = x[-1:]
-x = x[:-1]
-y = np.array(df["prediction"])
-y = y[:-1]
-x_train, x_test, y_train, y_test = train_test_split(x, y, test_size = 0.2)
+	#extract required data
+	time_series = []
+	for date in data:
+		time_series.append((date, float(data[date][FIELD])))
+	time_series.sort(key=lambda tup : tup[0])
+	dates = []
+	prices = []
+	for date, price in time_series:
+		dates.append(date)
+		prices.append(price)
 
-#run linear regression
-reg = LinearRegression()
-reg.fit(x_train, y_train)
-future = reg.predict(x_forecast)
-print("prediction:")
-print(future[0])
+	#build data structures
+	df = pd.DataFrame(data = prices, index = dates, columns = ["price"])
+	df["prediction"] = df[["price"]].shift(-1)
+	x = np.array(df.drop(["prediction"], 1))
+	x = preprocessing.scale(x)
+	x_forecast = x[-1:]
+	x = x[:-1]
+	y = np.array(df["prediction"])
+	y = y[:-1]
+	x_train, x_test, y_train, y_test = train_test_split(x, y, test_size = 0.2)
+
+	#run linear regression
+	reg = LinearRegression()
+	reg.fit(x_train, y_train)
+	future = reg.predict(x_forecast)
+	return future[0]
+
+#main
+parser = argparse.ArgumentParser(description = "Predect future values of forex")
+parser.add_argument("-k", "--key", default="PLXD9IM2VJWSJAPE", help="API key")
+parser.add_argument("-i", "--intraday", action="store_true", help="Set for hourly")
+args = parser.parse_args()
+
+assets = [("AUD","JPY"), ("AUD","NZD"), ("AUD","USD"), ("CAD","JPY"), ("CHF","JPY"), ("EUR","AUD"), ("EUR","GBP"), ("EUR","JPY"), ("EUR","USD"), ("GBP","AUD"), ("GBP","JPY"), ("GBP","USD"), ("NZD","JPY"), ("NZD","USD"), ("USD","CAD"), ("USD","CHF"), ("USD","JPY")] 
+
+if args.intraday:
+	interval = "60mins"
+else:
+	interval = False
+
+i = 1
+for asset in assets:
+	future = omen(args.key, asset[0], asset[1], interval)
+	print(asset[0] + "/" + asset[1] + ": " + str(future))
+	if i % 5 == 0:
+		time.sleep(300) #5 mins, api rate limit
+	i += 1
