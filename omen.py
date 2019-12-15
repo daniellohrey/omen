@@ -47,7 +47,7 @@ def omen(key, from_symbol, to_symbol, interval=False):
 	reg = LinearRegression()
 	reg.fit(x_train, y_train)
 	future = reg.predict(x_forecast)
-	return future[0]
+	return prices[-1], future[0]
 
 #main
 parser = argparse.ArgumentParser(description = "Predect future values of forex")
@@ -64,8 +64,30 @@ else:
 
 i = 1
 for asset in assets:
-	future = omen(args.key, asset[0], asset[1], interval)
-	print(asset[0] + "/" + asset[1] + ": " + str(future))
+	#set file name
+	file_name = asset[0] + "-" + asset[1] + "_"
+	if interval:
+		file_name += interval + ".txt"
+	else:
+		file_name += "daily.txt"
+
+	#do prediction
+	last, future = omen(args.key, asset[0], asset[1], interval)
+
+	#set write data
+	now = datetime.datetime.now()
+	now = now - datetime.timedelta(minutes=now.minute, seconds=now.second, microseconds=now.microsecond)
+	to_write = "last : " + str(last) + " next: " + str(future) + " - "
+	if last < future:
+		to_write += "CALL" + "\n"
+	else:
+		to_write += "PUT" + "\n"
+
+	#write to file
+	with open(file_name, "a") as f:
+		f.write(str(now) + " - " + to_write)
+			
+	#avoid rate limiting
 	if i % 5 == 0:
 		time.sleep(300) #5 mins, api rate limit
 	i += 1
