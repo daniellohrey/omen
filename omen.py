@@ -58,7 +58,7 @@ args = parser.parse_args()
 assets = [("AUD","JPY"), ("AUD","NZD"), ("AUD","USD"), ("CAD","JPY"), ("CHF","JPY"), ("EUR","AUD"), ("EUR","GBP"), ("EUR","JPY"), ("EUR","USD"), ("GBP","AUD"), ("GBP","JPY"), ("GBP","USD"), ("NZD","JPY"), ("NZD","USD"), ("USD","CAD"), ("USD","CHF"), ("USD","JPY")] 
 
 if args.intraday:
-	interval = "60mins"
+	interval = "60min"
 else:
 	interval = False
 
